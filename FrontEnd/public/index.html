@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>OmniScope Notebook (Static)</title>
+
+  <!-- React & ReactDOM -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <!-- Babel standalone with React preset -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- marked for Markdown -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    textarea { width: 100%; height: 100px; }
+    pre { background: #f7f7f7; padding: 10px; white-space: pre-wrap; }
+    button { margin-top: 5px; }
+    .cell { margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" data-presets="react">
+    const { useState } = React;
+
+    // get or create a session ID in localStorage, using crypto.randomUUID()
+    const getSession = () => {
+      let id = localStorage.getItem('session_id');
+      if (!id) {
+        id = crypto.randomUUID();
+        localStorage.setItem('session_id', id);
+      }
+      return id;
+    };
+
+    function MarkdownCell({ content, onChange }) {
+      const [html, setHtml] = useState('');
+      return (
+        <div className="cell">
+          <textarea
+            value={content}
+            onChange={e => onChange(e.target.value)}
+            placeholder="Type Markdown here…"
+          />
+          <button onClick={() => setHtml(marked.parse(content))}>
+            Render Markdown
+          </button>
+          <div
+            style={{ border: '1px solid #ddd', padding: 10, marginTop: 10 }}
+            dangerouslySetInnerHTML={{ __html: html }}
+          />
+        </div>
+      );
+    }
+
+    function CodeCell({ code, onChange, output, onRun }) {
+      const [running, setRunning] = useState(false);
+      const run = async () => {
+        setRunning(true);
+        try {
+          const res = await fetch('http://127.0.0.1:8000/execute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: getSession(), code })
+          });
+          const data = await res.json();
+          onRun(data.output);
+        } catch (err) {
+          onRun(err.toString());
+        }
+        setRunning(false);
+      };
+
+      return (
+        <div className="cell">
+          <textarea
+            value={code}
+            onChange={e => onChange(e.target.value)}
+            placeholder="Type Python code here…"
+          />
+          <button onClick={run} disabled={running}>
+            {running ? 'Running…' : 'Run Code'}
+          </button>
+          <pre>{output}</pre>
+        </div>
+      );
+    }
+
+    function App() {
+      const [cells, setCells] = useState([]);
+      const addCell = type => {
+        setCells([...cells, { id: crypto.randomUUID(), type, content: '', output: '' }]);
+      };
+      const updateCell = (id, fields) => {
+        setCells(cells.map(c => (c.id === id ? { ...c, ...fields } : c)));
+      };
+
+      return (
+        <div>
+          <h1>OmniScope Notebook</h1>
+          <button onClick={() => addCell('markdown')}>Add Markdown Cell</button>
+          <button onClick={() => addCell('code')}>Add Code Cell</button>
+
+          {cells.map(c => (
+            <div key={c.id}>
+              {c.type === 'markdown' ? (
+                <MarkdownCell
+                  content={c.content}
+                  onChange={text => updateCell(c.id, { content: text })}
+                />
+              ) : (
+                <CodeCell
+                  code={c.content}
+                  onChange={code => updateCell(c.id, { content: code })}
+                  output={c.output}
+                  onRun={out => updateCell(c.id, { output: out })}
+                />
+              )}
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
