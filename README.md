@@ -14,6 +14,12 @@ OmniScope-Assessment/
 
 ---
 
+## 🛠 Prerequisites
+
+* **Python**: 3.10 or higher
+* **pip**: Included with Python
+---
+
 ## ⚙️ Backend Setup (FastAPI)
 
 1. **Create and activate a virtual environment**
